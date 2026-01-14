@@ -23,6 +23,7 @@
 
     /* Admin-only tools hidden by default */
     #admin-only-tools { display:none; }
+    #adminLogoutBtn.hidden, #adminLoginBtn.hidden { display:none; }
   </style>
 </head>
 
@@ -31,14 +32,14 @@
   <nav class="bg-gray-800 py-4 px-6 flex justify-between items-center sticky top-0 z-50 shadow-lg">
     <div class="flex items-center space-x-2">
       <i data-feather="shield" class="text-yellow-400"></i>
-      <h1 class="text-xl medieval-font">Guild Power</h1>
+      <h1 class="text-xl medieval-font">CP Tracker</h1>
     </div>
 
     <div class="hidden md:flex space-x-6">
       <a href="#dashboard" class="hover:text-yellow-400 transition-colors">Dashboard</a>
       <a href="#members" class="hover:text-yellow-400 transition-colors">Members</a>
       <a href="#submit" class="hover:text-yellow-400 transition-colors">Submit CP</a>
-      <a href="#admin" class="hover:text-yellow-400 transition-colors">Admin</a>
+      <a href="#admin" class="hover:text-yellow-400 transition-colors">Register</a>
     </div>
 
     <!-- ✅ Admin Login/Logout -->
@@ -71,6 +72,7 @@
   <section id="dashboard" class="py-16 bg-gray-800">
     <div class="container mx-auto px-6">
       <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Guild Overview</h2>
+
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
         <div class="bg-gray-700 rounded-xl p-6 shadow-lg">
           <div class="flex items-center justify-between">
@@ -160,9 +162,10 @@
   <!-- Admin Section -->
   <section id="admin" class="py-16 bg-gray-900">
     <div class="container mx-auto px-6">
-      <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Admin Dashboard</h2>
+      <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Register</h2>
+
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Add Member Form (Admin creates official members) -->
+        <!-- ✅ Add Member Form (EVERYONE can create) -->
         <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
           <h3 class="text-xl font-bold mb-6">Add New Member</h3>
           <form id="add-member-form" class="space-y-4">
@@ -186,7 +189,7 @@
             </button>
           </form>
           <p class="text-sm text-gray-400 mt-3">
-            Only Admin can create official members and approve submissions.
+            Anyone can add a new member (creates only). Only Admin can update/delete.
           </p>
         </div>
 
@@ -226,27 +229,14 @@
     </div>
   </div>
 
+  <!-- ✅ Firebase v12 (module) + RTDB + Admin Auth -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
-    import {
-      getDatabase,
-      ref,
-      get,
-      push,
-      set,
-      update,
-      remove
-    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+    import { getDatabase, ref, get, push, set, update, remove } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-    // ✅ Admin auth only
-    import {
-      getAuth,
-      GoogleAuthProvider,
-      signInWithPopup,
-      signOut,
-      onAuthStateChanged
-    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+    // Admin auth only
+    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 
     const firebaseConfig = {
       apiKey: "AIzaSyA_C0Z-y3CjTFXeWTmvrK7y7cne1jlGbko",
@@ -270,8 +260,11 @@
     const auth = getAuth(app);
     const provider = new GoogleAuthProvider();
 
-    // 🔒 Replace this with your UID
-    const ADMIN_UID = "nztkDC7sYqTeB8uQ55x5vB8p0lf2";
+    // 🔒 Replace with your admin UID(s)
+    const ADMIN_UIDS = [
+      "nztkDC7sYqTeB8uQ55x5vB8p0lf2"
+      // "SECOND_ADMIN_UID_HERE"
+    ];
 
     const adminLoginBtn = document.getElementById("adminLoginBtn");
     const adminLogoutBtn = document.getElementById("adminLogoutBtn");
@@ -286,8 +279,12 @@
       catch (e) { console.error(e); alert("Logout failed: " + (e?.message || e)); }
     });
 
+    function isAdminUser(user){
+      return !!user && ADMIN_UIDS.includes(user.uid);
+    }
+
     onAuthStateChanged(auth, (user) => {
-      const isAdmin = !!user && user.uid === ADMIN_UID;
+      const isAdmin = isAdminUser(user);
 
       if (user) {
         adminLoginBtn.classList.add("hidden");
@@ -297,9 +294,10 @@
         adminLogoutBtn.classList.add("hidden");
       }
 
-      // show/hide admin-only tools
       const adminTools = document.getElementById("admin-only-tools");
       if (adminTools) adminTools.style.display = isAdmin ? "block" : "none";
+
+      console.log("Logged in:", user?.email, user?.uid, "isAdmin:", isAdmin);
     });
 
     const defaultAvatars = {
@@ -484,28 +482,20 @@
       feather.replace();
     }
 
-    // ✅ Members submit CP -> goes to /submissions (no login)
+    // ✅ Members submit CP -> /submissions (no login)
     document.getElementById("submit-cp-form").addEventListener("submit", async (e) => {
       e.preventDefault();
-
       const memberId = document.getElementById("submit-member-select").value;
       const newCP = parseInt(document.getElementById("submit-cp-value").value, 10);
-
       if(!memberId || Number.isNaN(newCP)) return alert("Select your name and enter CP");
 
       const newRef = push(submissionsRootRef);
-      await set(newRef, {
-        memberId,
-        newCP,
-        createdAt: Date.now(),
-        status: "pending"
-      });
-
+      await set(newRef, { memberId, newCP, createdAt: Date.now(), status: "pending" });
       document.getElementById("submit-cp-value").value = "";
       alert("Submitted! Admin will review it.");
     });
 
-    // Add Member (Admin - writes to /members)
+    // ✅ Add Member (EVERYONE can create)
     document.getElementById('add-member-form').addEventListener('submit', async e=>{
       e.preventDefault();
 
@@ -519,19 +509,13 @@
       if(!name || !cls || Number.isNaN(cp)) return alert("Fill all fields");
 
       const existing = await fetchMembers();
-      const exists = existing.some(m =>
-        (m.name||"").toLowerCase() === name.toLowerCase() && m.class === cls
-      );
+      const exists = existing.some(m => (m.name||"").toLowerCase() === name.toLowerCase() && m.class === cls);
       if(exists) return alert("Member exists!");
 
       const weekLabel = getWeekLabel();
       const newRef = push(membersRootRef);
       await set(newRef, {
-        name,
-        class: cls,
-        classColor: color,
-        cp,
-        growth: 0,
+        name, class: cls, classColor: color, cp, growth: 0,
         weeklyCP: [{ week: weekLabel, cp, growth: 0 }],
         avatar
       });
@@ -543,7 +527,7 @@
       await loadMembers();
     });
 
-    // Update CP (Admin)
+    // ✅ Update CP (Admin only via rules + UI hidden)
     document.getElementById('update-cp-form').addEventListener('submit', async e=>{
       e.preventDefault();
 
@@ -551,43 +535,49 @@
       const newCP = parseInt(document.getElementById('update-cp-value').value, 10);
       if(!id || Number.isNaN(newCP)) return alert("Select member and enter CP");
 
-      const memberRef = ref(db, `members/${id}`);
-      const snap = await get(memberRef);
-      if(!snap.exists()) return alert("Member not found!");
+      try{
+        const memberRef = ref(db, `members/${id}`);
+        const snap = await get(memberRef);
+        if(!snap.exists()) return alert("Member not found!");
 
-      const data = snap.val();
-      const prevCP = Number(data.cp) || 0;
-      const growth = newCP - prevCP;
-      const weekLabel = getWeekLabel();
+        const data = snap.val();
+        const prevCP = Number(data.cp) || 0;
+        const growth = newCP - prevCP;
+        const weekLabel = getWeekLabel();
 
-      let weeklyCP = Array.isArray(data.weeklyCP) ? [...data.weeklyCP] : [];
-      const existing = weeklyCP.find(w=>w.week === weekLabel);
-      if(existing){
-        existing.cp = newCP;
-        existing.growth = growth;
-      } else {
-        weeklyCP.push({ week: weekLabel, cp: newCP, growth });
+        let weeklyCP = Array.isArray(data.weeklyCP) ? [...data.weeklyCP] : [];
+        const existing = weeklyCP.find(w=>w.week === weekLabel);
+        if(existing){ existing.cp = newCP; existing.growth = growth; }
+        else { weeklyCP.push({ week: weekLabel, cp: newCP, growth }); }
+        if(weeklyCP.length > 4) weeklyCP = weeklyCP.slice(-4);
+
+        await update(memberRef, { cp: newCP, growth, weeklyCP });
+
+        alert(`Updated CP to ${newCP} (Growth: ${growth>=0?'+':''}${growth})`);
+        document.getElementById('update-cp-value').value = "";
+        await loadMembers();
+      } catch(err){
+        console.error("UPDATE FAILED:", err);
+        alert("Update failed: " + (err?.message || err));
       }
-      if(weeklyCP.length > 4) weeklyCP = weeklyCP.slice(-4);
-
-      await update(memberRef, { cp: newCP, growth, weeklyCP });
-
-      alert(`Updated CP to ${newCP} (Growth: ${growth>=0?'+':''}${growth})`);
-      document.getElementById('update-cp-value').value = "";
-      await loadMembers();
     });
 
-    // Delete Member (Admin)
+    // ✅ Delete Member (Admin only via rules + UI hidden)
     document.getElementById('delete-member-btn').addEventListener('click', async ()=>{
       const id = document.getElementById('update-member-select').value;
       if(!id) return alert("Select member");
       if(!confirm("Delete member?")) return;
 
-      await remove(ref(db, `members/${id}`));
-      alert("Deleted");
-      await populateMemberDropdowns();
-      await populateSubmitDropdown();
-      await loadMembers();
+      try{
+        await remove(ref(db, `members/${id}`));
+        alert("Deleted");
+        await populateMemberDropdowns();
+        await populateSubmitDropdown();
+        await loadMembers();
+      } catch(err){
+        console.error("DELETE FAILED:", err);
+        alert("Delete failed: " + (err?.message || err));
+      }
     });
 
     // Modal chart
