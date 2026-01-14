@@ -1,400 +1,257 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8" />
-  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>Midnight CP Tracker</title>
-  <link rel="icon" href="/static/favicon.ico" type="image/x-icon">
+<script type="module">
+  import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
+  import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
+  import {
+    getDatabase,
+    ref,
+    get,
+    push,
+    set,
+    update,
+    remove,
+    onValue
+  } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-  <script src="https://cdn.tailwindcss.com"></script>
-  <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
-  <script src="https://unpkg.com/feather-icons"></script>
-  <script src="https://cdn.jsdelivr.net/npm/vanta@latest/dist/vanta.globe.min.js"></script>
+  // Admin auth only
+  import {
+    getAuth,
+    GoogleAuthProvider,
+    signInWithPopup,
+    signOut,
+    onAuthStateChanged
+  } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
 
-  <style>
-    @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@300;400;500;600;700&display=swap');
-    .medieval-font { font-family: 'MedievalSharp', cursive; }
-    .gradient-bg { background: linear-gradient(135deg, #161133 0%, #29273f 100%); }
-    .frosted-glass { backdrop-filter: blur(10px); background: rgba(75, 59, 163, 0.1); }
-    .class-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
-    .cp-progress-bar { transition: width 0.5s ease-in-out; }
-    .achievement-badge { animation: pulse 2s infinite; box-shadow: 0 0 15px rgba(255,215,0,0.5); }
-    @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+  const firebaseConfig = {
+    apiKey: "AIzaSyA_C0Z-y3CjTFXeWTmvrK7y7cne1jlGbko",
+    authDomain: "cptracker-a0f52.firebaseapp.com",
+    databaseURL: "https://cptracker-a0f52-default-rtdb.firebaseio.com",
+    projectId: "cptracker-a0f52",
+    storageBucket: "cptracker-a0f52.firebasestorage.app",
+    messagingSenderId: "502447144576",
+    appId: "1:502447144576:web:7d5099ed4095f2bf9db065",
+    measurementId: "G-5TDM69JFJZ"
+  };
 
-    /* Admin-only tools hidden by default */
-    #admin-only-tools { display:none; }
-    #adminLogoutBtn.hidden, #adminLoginBtn.hidden { display:none; }
-  </style>
-</head>
+  const app = initializeApp(firebaseConfig);
+  getAnalytics(app);
+  const db = getDatabase(app);
 
-<body class="bg-gray-900 text-white font-['Inter']">
-  <!-- Navigations -->
-  <nav class="bg-gray-800 py-4 px-6 flex justify-between items-center sticky top-0 z-50 shadow-lg">
-    <div class="flex items-center space-x-2">
-      <i data-feather="shield" class="text-yellow-400"></i>
-      <h1 class="text-xl medieval-font">CP Tracker</h1>
-    </div>
+  const membersRootRef = ref(db, "members");
 
-    <div class="hidden md:flex space-x-6">
-      <a href="#dashboard" class="hover:text-yellow-400 transition-colors">Dashboard</a>
-      <a href="#members" class="hover:text-yellow-400 transition-colors">Members</a>
-      <!-- Removed Submit CP link -->
-      <a href="#admin" class="hover:text-yellow-400 transition-colors">Register</a>
-    </div>
+  // ✅ Admin Auth
+  const auth = getAuth(app);
+  const provider = new GoogleAuthProvider();
 
-    <!-- ✅ Admin Login/Logout -->
-    <div class="flex items-center gap-3">
-      <button id="adminLoginBtn" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold px-4 py-2 rounded-lg">
-        Admin Login
-      </button>
-      <button id="adminLogoutBtn" class="hidden bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded-lg">
-        Logout
-      </button>
+  // 🔒 Replace with your admin UID(s)
+  const ADMIN_UIDS = [
+    "nztkDC7sYqTeB8uQ55x5vB8p0lf2"
+    // "SECOND_ADMIN_UID_HERE"
+  ];
 
-      <button class="md:hidden">
-        <i data-feather="menu"></i>
-      </button>
-    </div>
-  </nav>
+  const adminLoginBtn = document.getElementById("adminLoginBtn");
+  const adminLogoutBtn = document.getElementById("adminLogoutBtn");
 
-  <!-- Hero Section -->
-  <section id="hero" class="gradient-bg py-20 relative overflow-hidden">
-    <div id="vanta-globe" class="absolute inset-0"></div>
-    <div class="container mx-auto px-6 relative z-10">
-      <div class="max-w-3xl mx-auto text-center">
-        <h2 class="text-5xl md:text-6xl font-bold mb-6 medieval-font">MIDNIGHT</h2>
-        <p class="text-xl mb-8 text-gray-200">Track your guild's Combat Power progression and dominate the rankings!</p>
-      </div>
-    </div>
-  </section>
+  adminLoginBtn.addEventListener("click", async () => {
+    try {
+      await signInWithPopup(auth, provider);
+    } catch (e) {
+      console.error(e);
+      alert("Admin login failed: " + (e?.message || e));
+    }
+  });
 
-  <!-- Dashboard -->
-  <section id="dashboard" class="py-16 bg-gray-800">
-    <div class="container mx-auto px-6">
-      <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Guild Overview</h2>
+  adminLogoutBtn.addEventListener("click", async () => {
+    try {
+      await signOut(auth);
+    } catch (e) {
+      console.error(e);
+      alert("Logout failed: " + (e?.message || e));
+    }
+  });
 
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
-        <div class="bg-gray-700 rounded-xl p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400">Total Members</p>
-              <p class="text-3xl font-bold" id="total-members">0</p>
-            </div>
-            <i data-feather="users" class="text-yellow-400"></i>
-          </div>
-        </div>
+  function isAdminUser(user) {
+    return !!user && ADMIN_UIDS.includes(user.uid);
+  }
 
-        <div class="bg-gray-700 rounded-xl p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400">Avg CP</p>
-              <p class="text-3xl font-bold" id="avg-cp">0</p>
-            </div>
-            <i data-feather="trending-up" class="text-green-400"></i>
-          </div>
-        </div>
+  onAuthStateChanged(auth, (user) => {
+    const isAdmin = isAdminUser(user);
 
-        <div class="bg-gray-700 rounded-xl p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400">Top Growth</p>
-              <p class="text-3xl font-bold" id="top-growth">0</p>
-            </div>
-            <i data-feather="award" class="text-purple-400"></i>
-          </div>
-        </div>
+    if (user) {
+      adminLoginBtn.classList.add("hidden");
+      adminLogoutBtn.classList.remove("hidden");
+    } else {
+      adminLoginBtn.classList.remove("hidden");
+      adminLogoutBtn.classList.add("hidden");
+    }
 
-        <div class="bg-gray-700 rounded-xl p-6 shadow-lg">
-          <div class="flex items-center justify-between">
-            <div>
-              <p class="text-gray-400">Active Classes</p>
-              <p class="text-3xl font-bold" id="active-classes">0</p>
-            </div>
-            <i data-feather="shield" class="text-blue-400"></i>
-          </div>
-        </div>
-      </div>
+    const adminTools = document.getElementById("admin-only-tools");
+    if (adminTools) adminTools.style.display = isAdmin ? "block" : "none";
 
-      <!-- Weekly Progress Chart -->
-      <div class="bg-gray-700 rounded-xl p-6 shadow-lg mb-12">
-        <h3 class="text-xl font-bold mb-6">Weekly Guild CP Progress</h3>
-        <div class="h-64">
-          <canvas id="guildProgressChart"></canvas>
-        </div>
-      </div>
-    </div>
-  </section>
+    console.log("Logged in:", user?.email, user?.uid, "isAdmin:", isAdmin);
+  });
 
-  <!-- Members Section -->
-  <section id="members" class="py-16 bg-gray-900">
-    <div class="container mx-auto px-6">
-      <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Guild Members</h2>
-      <div class="flex flex-wrap gap-2 mb-8 justify-center" id="class-filters"></div>
-      <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="members-grid"></div>
-    </div>
-  </section>
+  const defaultAvatars = {
+    Bow: "https://i.imgur.com/w8VJlOnm.jpg",
+    Crossbow: "https://i.imgur.com/Omci8iCm.jpg",
+    Staff: "https://i.imgur.com/Bo3ZY5vm.jpg",
+    "Battle Shield": "https://i.imgur.com/YCpmOwTm.jpg",
+    "Great Sword": "https://i.imgur.com/IHsuu5am.jpg",
+    "Battle Staff": "https://i.imgur.com/xI1IKPsm.jpg",
+    "Sword & Shield": "https://i.imgur.com/I4Rku2cm.jpg",
+    Dagger: "https://i.imgur.com/fzTxuszm.jpg",
+    "Bare Hand": "https://i.imgur.com/Bo3ZY5vm.jpg"
+  };
 
-  <!-- Admin Section -->
-  <section id="admin" class="py-16 bg-gray-900">
-    <div class="container mx-auto px-6">
-      <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Register</h2>
+  let membersCache = [];
+  let activeClassFilter = "ALL";
 
-      <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- ✅ Add Member Form (EVERYONE can create) -->
-        <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 class="text-xl font-bold mb-6">Add New Member</h3>
-          <form id="add-member-form" class="space-y-4">
-            <input type="text" id="new-member-name" placeholder="Member Name" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3">
-            <select id="new-member-class" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3">
-              <option value="">Select Class</option>
-              <option value="Bare Hand" data-color="bg-red-500">Bare Hand</option>
-              <option value="Sword & Shield" data-color="bg-blue-500">Sword & Shield</option>
-              <option value="Battle Staff" data-color="bg-purple-500">Battle Staff</option>
-              <option value="Battle Shield" data-color="bg-green-500">Battle Shield</option>
-              <option value="Great Sword" data-color="bg-yellow-500">Great Sword</option>
-              <option value="Staff" data-color="bg-indigo-500">Staff</option>
-              <option value="Dagger" data-color="bg-pink-500">Dagger</option>
-              <option value="Bow" data-color="bg-teal-500">Bow</option>
-              <option value="Crossbow" data-color="bg-orange-500">Crossbow</option>
-            </select>
-            <input type="number" id="new-member-cp" placeholder="Initial CP" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3">
-            <input type="text" id="new-member-avatar" placeholder="Avatar URL (optional)" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3">
-            <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg">
-              Add Member
-            </button>
-          </form>
-          <p class="text-sm text-gray-400 mt-3">
-            Anyone can add a new member (creates only). Only Admin can update/delete.
-          </p>
-        </div>
+  // ✅ Stable week key + display label
+  function toISODate(d) {
+    const y = d.getFullYear();
+    const m = String(d.getMonth() + 1).padStart(2, "0");
+    const day = String(d.getDate()).padStart(2, "0");
+    return `${y}-${m}-${day}`;
+  }
 
-        <!-- ✅ Update/Delete CP & Member (Admin only) -->
-        <div id="admin-only-tools" class="bg-gray-800 rounded-xl p-6 shadow-lg">
-          <h3 class="text-xl font-bold mb-4">Update / Delete Member</h3>
-          <form id="update-cp-form" class="space-y-4">
-            <select id="update-member-select" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
-              <option value="">Select Member</option>
-            </select>
-            <input type="number" id="update-cp-value" placeholder="New CP" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
-            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg">
-              Update CP
-            </button>
-          </form>
-          <button id="delete-member-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg mt-4">
-            Delete Selected Member
-          </button>
-        </div>
-      </div>
-    </div>
-  </section>
+  function getWeekMeta() {
+    const now = new Date();
+    const day = now.getDay(); // 0=Sun
 
-  <!-- Member Detail Modal -->
-  <div id="memberModal" class="fixed inset-0 bg-black/50 backdrop-blur-sm hidden items-center justify-center z-50">
-    <div class="bg-gray-800 rounded-xl shadow-lg max-w-lg w-full p-6 relative">
-      <button id="closeModal" class="absolute top-3 right-3 text-gray-300 hover:text-white text-xl font-bold">&times;</button>
-      <div class="flex flex-col items-center space-y-4">
-        <img id="modalAvatar" src="" alt="Avatar" class="w-24 h-24 rounded-full border-2 border-yellow-400">
-        <h2 id="modalName" class="text-2xl font-bold medieval-font">Member Name</h2>
-        <span id="modalClass" class="class-badge bg-blue-500 text-white">Class</span>
-        <p class="mt-2">Current CP: <span id="modalCP">0</span> | Growth: <span id="modalGrowth">0</span></p>
-      </div>
-      <div class="mt-6 h-48">
-        <canvas id="modalChart"></canvas>
-      </div>
-    </div>
-  </div>
+    const sunday = new Date(now);
+    sunday.setHours(0, 0, 0, 0);
+    sunday.setDate(now.getDate() - day);
 
-  <!-- ✅ Firebase v12 (module) + RTDB + Admin Auth -->
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
-    import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
-    import { getDatabase, ref, get, push, set, update, remove } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
+    const saturday = new Date(sunday);
+    saturday.setDate(sunday.getDate() + 6);
 
-    // Admin auth only
-    import { getAuth, GoogleAuthProvider, signInWithPopup, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+    const format = (d) =>
+      d.toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
-    const firebaseConfig = {
-      apiKey: "AIzaSyA_C0Z-y3CjTFXeWTmvrK7y7cne1jlGbko",
-      authDomain: "cptracker-a0f52.firebaseapp.com",
-      databaseURL: "https://cptracker-a0f52-default-rtdb.firebaseio.com",
-      projectId: "cptracker-a0f52",
-      storageBucket: "cptracker-a0f52.firebasestorage.app",
-      messagingSenderId: "502447144576",
-      appId: "1:502447144576:web:7d5099ed4095f2bf9db065",
-      measurementId: "G-5TDM69JFJZ"
+    return {
+      weekKey: toISODate(sunday), // stable grouping key
+      weekLabel: `${format(sunday)} - ${format(saturday)}` // pretty display
     };
+  }
 
-    const app = initializeApp(firebaseConfig);
-    getAnalytics(app);
-    const db = getDatabase(app);
+  async function fetchMembers() {
+    const snap = await get(membersRootRef);
+    const val = snap.val() || {};
+    return Object.entries(val).map(([id, data]) => ({ id, ...data }));
+  }
 
-    const membersRootRef = ref(db, "members");
+  async function populateMemberDropdowns() {
+    const select = document.getElementById("update-member-select");
+    if (!select) return;
 
-    // ✅ Admin Auth
-    const auth = getAuth(app);
-    const provider = new GoogleAuthProvider();
+    select.innerHTML = '<option value="">Select Member</option>';
+    const list = await fetchMembers();
 
-    // 🔒 Replace with your admin UID(s)
-    const ADMIN_UIDS = [
-      "nztkDC7sYqTeB8uQ55x5vB8p0lf2"
-      // "SECOND_ADMIN_UID_HERE"
-    ];
-
-    const adminLoginBtn = document.getElementById("adminLoginBtn");
-    const adminLogoutBtn = document.getElementById("adminLogoutBtn");
-
-    adminLoginBtn.addEventListener("click", async () => {
-      try { await signInWithPopup(auth, provider); }
-      catch (e) { console.error(e); alert("Admin login failed: " + (e?.message || e)); }
+    list.forEach((m) => {
+      const option = document.createElement("option");
+      option.value = m.id;
+      option.textContent = m.name;
+      select.appendChild(option);
     });
+  }
 
-    adminLogoutBtn.addEventListener("click", async () => {
-      try { await signOut(auth); }
-      catch (e) { console.error(e); alert("Logout failed: " + (e?.message || e)); }
-    });
+  function renderClassFilters() {
+    const wrap = document.getElementById("class-filters");
+    const classes = ["ALL", ...new Set(membersCache.map((m) => m.class))];
 
-    function isAdminUser(user){
-      return !!user && ADMIN_UIDS.includes(user.uid);
-    }
-
-    onAuthStateChanged(auth, (user) => {
-      const isAdmin = isAdminUser(user);
-
-      if (user) {
-        adminLoginBtn.classList.add("hidden");
-        adminLogoutBtn.classList.remove("hidden");
-      } else {
-        adminLoginBtn.classList.remove("hidden");
-        adminLogoutBtn.classList.add("hidden");
-      }
-
-      const adminTools = document.getElementById("admin-only-tools");
-      if (adminTools) adminTools.style.display = isAdmin ? "block" : "none";
-
-      console.log("Logged in:", user?.email, user?.uid, "isAdmin:", isAdmin);
-    });
-
-    const defaultAvatars = {
-      'Bow':'https://i.imgur.com/w8VJlOnm.jpg',
-      'Crossbow':'https://i.imgur.com/Omci8iCm.jpg',
-      'Staff':'https://i.imgur.com/Bo3ZY5vm.jpg',
-      'Battle Shield':'https://i.imgur.com/YCpmOwTm.jpg',
-      'Great Sword':'https://i.imgur.com/IHsuu5am.jpg',
-      'Battle Staff':'https://i.imgur.com/xI1IKPsm.jpg',
-      'Sword & Shield':'https://i.imgur.com/I4Rku2cm.jpg',
-      'Dagger':'https://i.imgur.com/fzTxuszm.jpg',
-      'Bare Hand':'https://i.imgur.com/Bo3ZY5vm.jpg'
-    };
-
-    let membersCache = [];
-    let activeClassFilter = "ALL";
-
-    function getWeekLabel(){
-      const now = new Date();
-      const day = now.getDay();
-      const sunday = new Date(now); sunday.setDate(now.getDate()-day);
-      const saturday = new Date(sunday); saturday.setDate(sunday.getDate()+6);
-      const format = d=>d.toLocaleDateString('en-US',{month:'short', day:'numeric'});
-      return `${format(sunday)} - ${format(saturday)}`;
-    }
-
-    async function fetchMembers(){
-      const snap = await get(membersRootRef);
-      const val = snap.val() || {};
-      return Object.entries(val).map(([id, data]) => ({ id, ...data }));
-    }
-
-    async function populateMemberDropdowns() {
-      const select = document.getElementById('update-member-select');
-      select.innerHTML = '<option value="">Select Member</option>';
-
-      const list = await fetchMembers();
-      list.forEach(m=>{
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.textContent = m.name;
-        select.appendChild(option);
-      });
-    }
-
-    function renderClassFilters(){
-      const wrap = document.getElementById("class-filters");
-      const classes = ["ALL", ...new Set(membersCache.map(m=>m.class))];
-
-      wrap.innerHTML = classes.map(cls => {
+    wrap.innerHTML = classes
+      .map((cls) => {
         const isActive = cls === activeClassFilter;
         return `
-          <button class="px-3 py-1 rounded-full text-sm border ${isActive ? 'bg-yellow-500 text-gray-900 border-yellow-400' : 'bg-gray-800 text-white border-gray-700'}"
+          <button class="px-3 py-1 rounded-full text-sm border ${
+            isActive
+              ? "bg-yellow-500 text-gray-900 border-yellow-400"
+              : "bg-gray-800 text-white border-gray-700"
+          }"
             data-class="${cls}">${cls}</button>
         `;
-      }).join("");
+      })
+      .join("");
 
-      wrap.querySelectorAll("button").forEach(btn=>{
-        btn.addEventListener("click", ()=>{
-          activeClassFilter = btn.dataset.class;
-          renderMembersGrid();
-        });
+    wrap.querySelectorAll("button").forEach((btn) => {
+      btn.addEventListener("click", () => {
+        activeClassFilter = btn.dataset.class;
+        renderMembersGrid();
       });
-    }
+    });
+  }
 
-    let guildChartInstance = null;
-    function renderGuildWeeklyChart(){
-      const canvas = document.getElementById("guildProgressChart");
-      if(!canvas) return;
-      const ctx = canvas.getContext("2d");
+  let guildChartInstance = null;
 
-      const weekMap = new Map();
-      membersCache.forEach(m=>{
-        const list = Array.isArray(m.weeklyCP) ? m.weeklyCP : [];
-        list.forEach(w=>{
-          const key = w.week;
-          weekMap.set(key, (weekMap.get(key) || 0) + (Number(w.cp) || 0));
-        });
+  function renderGuildWeeklyChart() {
+    const canvas = document.getElementById("guildProgressChart");
+    if (!canvas) return;
+    const ctx = canvas.getContext("2d");
+
+    // ✅ Group by stable weekKey; keep label for display
+    const weekMap = new Map(); // weekKey -> { label, total }
+    membersCache.forEach((m) => {
+      const list = Array.isArray(m.weeklyCP) ? m.weeklyCP : [];
+      list.forEach((w) => {
+        const key = w.weekKey || w.week; // backward compatible
+        if (!key) return;
+
+        const label = w.weekLabel || w.week || key;
+        const cur = weekMap.get(key) || { label, total: 0 };
+        cur.total += Number(w.cp) || 0;
+        cur.label = label;
+        weekMap.set(key, cur);
       });
+    });
 
-      const labels = Array.from(weekMap.keys());
-      const data = labels.map(l => weekMap.get(l) || 0);
+    const keys = Array.from(weekMap.keys()).sort(); // stable chronological sort
+    const labels = keys.map((k) => weekMap.get(k)?.label || k);
+    const data = keys.map((k) => weekMap.get(k)?.total || 0);
 
-      if(guildChartInstance) guildChartInstance.destroy();
-      guildChartInstance = new Chart(ctx, {
-        type: "line",
-        data: {
-          labels,
-          datasets: [{
+    if (guildChartInstance) guildChartInstance.destroy();
+    guildChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels,
+        datasets: [
+          {
             label: "Guild Total CP",
             data,
             borderColor: "#60a5fa",
             backgroundColor: "rgba(96,165,250,0.12)",
             tension: 0.35,
             fill: true
-          }]
-        },
-        options: {
-          responsive: true,
-          maintainAspectRatio: false,
-          plugins: { legend: { display: false } },
-          scales: {
-            y: { beginAtZero: false },
-            x: { grid: { color: "rgba(255,255,255,0.1)" } }
           }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: false },
+          x: { grid: { color: "rgba(255,255,255,0.1)" } }
         }
-      });
-    }
+      }
+    });
+  }
 
-    function renderMembersGrid(){
-      const grid = document.getElementById('members-grid');
-      const list = (activeClassFilter === "ALL")
+  function renderMembersGrid() {
+    const grid = document.getElementById("members-grid");
+    const list =
+      activeClassFilter === "ALL"
         ? membersCache
-        : membersCache.filter(m => m.class === activeClassFilter);
+        : membersCache.filter((m) => m.class === activeClassFilter);
 
-      grid.innerHTML = list.map(m=>`
+    grid.innerHTML = list
+      .map(
+        (m) => `
         <div class="bg-gray-800 rounded-xl p-6 shadow-lg border border-gray-400 cursor-pointer hover:shadow-xl transition-all" data-id="${m.id}">
           <div class="flex items-center justify-between mb-4">
             <div class="flex items-center space-x-3">
-              <img src="${m.avatar||defaultAvatars[m.class]}" alt="${m.name}" class="w-12 h-12 rounded-full">
+              <img src="${m.avatar || defaultAvatars[m.class]}" alt="${m.name}" class="w-12 h-12 rounded-full">
               <div>
                 <h4 class="font-bold">${m.name}</h4>
-                <span class="class-badge ${m.classColor || 'bg-gray-500'} text-white">${m.class}</span>
+                <span class="class-badge ${m.classColor || "bg-gray-500"} text-white">${m.class}</span>
               </div>
             </div>
             <div class="achievement-badge bg-yellow-500 text-gray-900 rounded-full p-2">
@@ -403,183 +260,228 @@
           </div>
           <div class="mb-4">
             <div class="flex justify-between text-sm mb-1">
-              <span>Current CP: ${(Number(m.cp)||0).toLocaleString()}</span>
-              <span class="text-green-400">${(Number(m.growth)||0)>=0?'+':''}${(Number(m.growth)||0).toLocaleString()}</span>
+              <span>Current CP: ${(Number(m.cp) || 0).toLocaleString()}</span>
+              <span class="text-green-400">${(Number(m.growth) || 0) >= 0 ? "+" : ""}${(Number(m.growth) || 0).toLocaleString()}</span>
             </div>
             <div class="w-full bg-gray-700 rounded-full h-2">
-              <div class="cp-progress-bar bg-green-500 h-2 rounded-full" style="width:${Math.min(100,((Number(m.cp)||0)/20000)*100)}%"></div>
+              <div class="cp-progress-bar bg-green-500 h-2 rounded-full" style="width:${Math.min(
+                100,
+                ((Number(m.cp) || 0) / 20000) * 100
+              )}%"></div>
             </div>
           </div>
         </div>
-      `).join('');
+      `
+      )
+      .join("");
 
-      grid.querySelectorAll("[data-id]").forEach(card=>{
-        card.addEventListener("click", ()=>viewMember(card.dataset.id));
-      });
+    grid.querySelectorAll("[data-id]").forEach((card) => {
+      card.addEventListener("click", () => viewMember(card.dataset.id));
+    });
 
-      feather.replace();
-    }
+    feather.replace();
+  }
 
-    async function loadMembers(){
-      membersCache = await fetchMembers();
+  // ✅ Real-time sync (this is the big fix)
+  function startMembersListener() {
+    onValue(membersRootRef, (snap) => {
+      const val = snap.val() || {};
+      membersCache = Object.entries(val).map(([id, data]) => ({ id, ...data }));
 
-      document.getElementById('total-members').textContent = membersCache.length;
-      document.getElementById('avg-cp').textContent =
-        membersCache.length
-          ? Math.round(membersCache.reduce((a,b)=>a+(Number(b.cp)||0),0)/membersCache.length).toLocaleString()
-          : "0";
-      document.getElementById('top-growth').textContent =
-        membersCache.length
-          ? Math.max(...membersCache.map(m=>Number(m.growth)||0)).toLocaleString()
-          : "0";
-      document.getElementById('active-classes').textContent =
-        [...new Set(membersCache.map(m=>m.class))].length + '/9';
+      document.getElementById("total-members").textContent = membersCache.length;
+
+      document.getElementById("avg-cp").textContent = membersCache.length
+        ? Math.round(
+            membersCache.reduce((a, b) => a + (Number(b.cp) || 0), 0) /
+              membersCache.length
+          ).toLocaleString()
+        : "0";
+
+      document.getElementById("top-growth").textContent = membersCache.length
+        ? Math.max(...membersCache.map((m) => Number(m.growth) || 0)).toLocaleString()
+        : "0";
+
+      document.getElementById("active-classes").textContent =
+        [...new Set(membersCache.map((m) => m.class))].length + "/9";
 
       renderClassFilters();
       renderMembersGrid();
       renderGuildWeeklyChart();
       feather.replace();
+
+      // keep dropdown synced for admins
+      populateMemberDropdowns();
+    });
+  }
+
+  // ✅ Add Member (EVERYONE can create)
+  document.getElementById("add-member-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const name = document.getElementById("new-member-name").value.trim();
+    const cls = document.getElementById("new-member-class").value;
+    const cp = parseInt(document.getElementById("new-member-cp").value, 10);
+    let avatar = document.getElementById("new-member-avatar").value.trim();
+
+    if (!avatar) avatar = defaultAvatars[cls] || defaultAvatars["Bare Hand"];
+    const color =
+      document.querySelector(`#new-member-class option[value="${cls}"]`)?.dataset
+        .color || "bg-gray-500";
+
+    if (!name || !cls || Number.isNaN(cp)) return alert("Fill all fields");
+
+    const existing = await fetchMembers();
+    const exists = existing.some(
+      (m) => (m.name || "").toLowerCase() === name.toLowerCase() && m.class === cls
+    );
+    if (exists) return alert("Member exists!");
+
+    const { weekKey, weekLabel } = getWeekMeta();
+
+    const newRef = push(membersRootRef);
+    await set(newRef, {
+      name,
+      class: cls,
+      classColor: color,
+      cp,
+      growth: 0,
+      weeklyCP: [{ weekKey, weekLabel, cp, growth: 0 }],
+      avatar
+    });
+
+    alert("Member added!");
+    e.target.reset();
+    // no need to call loadMembers(); realtime listener updates everyone
+  });
+
+  // ✅ Update CP (Admin only via rules + UI hidden)
+  document.getElementById("update-cp-form").addEventListener("submit", async (e) => {
+    e.preventDefault();
+
+    const id = document.getElementById("update-member-select").value;
+    const newCP = parseInt(document.getElementById("update-cp-value").value, 10);
+    if (!id || Number.isNaN(newCP)) return alert("Select member and enter CP");
+
+    try {
+      const memberRef = ref(db, `members/${id}`);
+      const snap = await get(memberRef);
+      if (!snap.exists()) return alert("Member not found!");
+
+      const data = snap.val();
+      const prevCP = Number(data.cp) || 0;
+      const growth = newCP - prevCP;
+
+      const { weekKey, weekLabel } = getWeekMeta();
+
+      let weeklyCP = Array.isArray(data.weeklyCP) ? [...data.weeklyCP] : [];
+
+      // ✅ match by weekKey (stable)
+      const existing = weeklyCP.find((w) => (w.weekKey || w.week) === weekKey);
+      if (existing) {
+        existing.cp = newCP;
+        existing.growth = growth;
+        existing.weekKey = weekKey;
+        existing.weekLabel = weekLabel;
+      } else {
+        weeklyCP.push({ weekKey, weekLabel, cp: newCP, growth });
+      }
+
+      if (weeklyCP.length > 4) weeklyCP = weeklyCP.slice(-4);
+
+      await update(memberRef, { cp: newCP, growth, weeklyCP });
+
+      alert(
+        `Updated CP to ${newCP} (Growth: ${growth >= 0 ? "+" : ""}${growth})`
+      );
+      document.getElementById("update-cp-value").value = "";
+      // realtime listener updates UI
+    } catch (err) {
+      console.error("UPDATE FAILED:", err);
+      alert("Update failed: " + (err?.message || err));
     }
+  });
 
-    // ✅ Add Member (EVERYONE can create)
-    document.getElementById('add-member-form').addEventListener('submit', async e=>{
-      e.preventDefault();
+  // ✅ Delete Member (Admin only via rules + UI hidden)
+  document.getElementById("delete-member-btn").addEventListener("click", async () => {
+    const id = document.getElementById("update-member-select").value;
+    if (!id) return alert("Select member");
+    if (!confirm("Delete member?")) return;
 
-      const name = document.getElementById('new-member-name').value.trim();
-      const cls = document.getElementById('new-member-class').value;
-      const cp = parseInt(document.getElementById('new-member-cp').value, 10);
-      let avatar = document.getElementById('new-member-avatar').value.trim();
+    try {
+      await remove(ref(db, `members/${id}`));
+      alert("Deleted");
+      // realtime listener updates UI
+    } catch (err) {
+      console.error("DELETE FAILED:", err);
+      alert("Delete failed: " + (err?.message || err));
+    }
+  });
 
-      if(!avatar) avatar = defaultAvatars[cls] || defaultAvatars['Bare Hand'];
-      const color = document.querySelector(`#new-member-class option[value="${cls}"]`)?.dataset.color || 'bg-gray-500';
-      if(!name || !cls || Number.isNaN(cp)) return alert("Fill all fields");
+  // Modal chart
+  let modalChartInstance = null;
 
-      const existing = await fetchMembers();
-      const exists = existing.some(m => (m.name||"").toLowerCase() === name.toLowerCase() && m.class === cls);
-      if(exists) return alert("Member exists!");
+  function viewMember(id) {
+    const m = membersCache.find((x) => x.id === id);
+    if (!m) return;
 
-      const weekLabel = getWeekLabel();
-      const newRef = push(membersRootRef);
-      await set(newRef, {
-        name, class: cls, classColor: color, cp, growth: 0,
-        weeklyCP: [{ week: weekLabel, cp, growth: 0 }],
-        avatar
-      });
+    document.getElementById("modalAvatar").src = m.avatar || defaultAvatars[m.class];
+    document.getElementById("modalName").textContent = m.name;
+    document.getElementById("modalClass").textContent = m.class;
+    document.getElementById("modalCP").textContent = (Number(m.cp) || 0).toLocaleString();
+    document.getElementById("modalGrowth").textContent =
+      (Number(m.growth) || 0) >= 0 ? "+" : "";
+    document.getElementById("modalGrowth").textContent += (Number(m.growth) || 0).toLocaleString();
 
-      alert("Member added!");
-      e.target.reset();
-      await populateMemberDropdowns();
-      await loadMembers();
-    });
+    const ctx = document.getElementById("modalChart").getContext("2d");
 
-    // ✅ Update CP (Admin only via rules + UI hidden)
-    document.getElementById('update-cp-form').addEventListener('submit', async e=>{
-      e.preventDefault();
+    const weeks = (m.weeklyCP || []).map((w) => w.weekLabel || w.week || w.weekKey);
+    const cpValues = (m.weeklyCP || []).map((w) => w.cp);
 
-      const id = document.getElementById('update-member-select').value;
-      const newCP = parseInt(document.getElementById('update-cp-value').value, 10);
-      if(!id || Number.isNaN(newCP)) return alert("Select member and enter CP");
-
-      try{
-        const memberRef = ref(db, `members/${id}`);
-        const snap = await get(memberRef);
-        if(!snap.exists()) return alert("Member not found!");
-
-        const data = snap.val();
-        const prevCP = Number(data.cp) || 0;
-        const growth = newCP - prevCP;
-        const weekLabel = getWeekLabel();
-
-        let weeklyCP = Array.isArray(data.weeklyCP) ? [...data.weeklyCP] : [];
-        const existing = weeklyCP.find(w=>w.week === weekLabel);
-        if(existing){ existing.cp = newCP; existing.growth = growth; }
-        else { weeklyCP.push({ week: weekLabel, cp: newCP, growth }); }
-        if(weeklyCP.length > 4) weeklyCP = weeklyCP.slice(-4);
-
-        await update(memberRef, { cp: newCP, growth, weeklyCP });
-
-        alert(`Updated CP to ${newCP} (Growth: ${growth>=0?'+':''}${growth})`);
-        document.getElementById('update-cp-value').value = "";
-        await loadMembers();
-      } catch(err){
-        console.error("UPDATE FAILED:", err);
-        alert("Update failed: " + (err?.message || err));
-      }
-    });
-
-    // ✅ Delete Member (Admin only via rules + UI hidden)
-    document.getElementById('delete-member-btn').addEventListener('click', async ()=>{
-      const id = document.getElementById('update-member-select').value;
-      if(!id) return alert("Select member");
-      if(!confirm("Delete member?")) return;
-
-      try{
-        await remove(ref(db, `members/${id}`));
-        alert("Deleted");
-        await populateMemberDropdowns();
-        await loadMembers();
-      } catch(err){
-        console.error("DELETE FAILED:", err);
-        alert("Delete failed: " + (err?.message || err));
-      }
-    });
-
-    // Modal chart
-    let modalChartInstance = null;
-    function viewMember(id){
-      const m = membersCache.find(x=>x.id===id);
-      if(!m) return;
-
-      document.getElementById('modalAvatar').src = m.avatar||defaultAvatars[m.class];
-      document.getElementById('modalName').textContent = m.name;
-      document.getElementById('modalClass').textContent = m.class;
-      document.getElementById('modalCP').textContent = (Number(m.cp)||0).toLocaleString();
-      document.getElementById('modalGrowth').textContent =
-        ((Number(m.growth)||0)>=0?'+':'') + (Number(m.growth)||0).toLocaleString();
-
-      const ctx = document.getElementById('modalChart').getContext('2d');
-      const weeks = (m.weeklyCP || []).map(w=>w.week);
-      const cpValues = (m.weeklyCP || []).map(w=>w.cp);
-
-      if(modalChartInstance) modalChartInstance.destroy();
-      modalChartInstance = new Chart(ctx,{
-        type:'line',
-        data:{ labels:weeks, datasets:[{
-          label:'CP',
-          data:cpValues,
-          borderColor:'#fbbf24',
-          backgroundColor:'rgba(251,191,36,0.15)',
-          tension:0.4,
-          fill:true
-        }]},
-        options:{
-          responsive:true,
-          maintainAspectRatio:false,
-          plugins:{ legend:{ display:false } },
-          scales:{ y:{ beginAtZero:false }, x:{ grid:{ color:"rgba(255,255,255,0.1)" } } }
+    if (modalChartInstance) modalChartInstance.destroy();
+    modalChartInstance = new Chart(ctx, {
+      type: "line",
+      data: {
+        labels: weeks,
+        datasets: [
+          {
+            label: "CP",
+            data: cpValues,
+            borderColor: "#fbbf24",
+            backgroundColor: "rgba(251,191,36,0.15)",
+            tension: 0.4,
+            fill: true
+          }
+        ]
+      },
+      options: {
+        responsive: true,
+        maintainAspectRatio: false,
+        plugins: { legend: { display: false } },
+        scales: {
+          y: { beginAtZero: false },
+          x: { grid: { color: "rgba(255,255,255,0.1)" } }
         }
-      });
-
-      document.getElementById('memberModal').classList.remove('hidden');
-      document.getElementById('memberModal').classList.add('flex');
-    }
-    window.viewMember = viewMember;
-
-    document.getElementById('closeModal').addEventListener('click',()=>{
-      document.getElementById('memberModal').classList.add('hidden');
-      document.getElementById('memberModal').classList.remove('flex');
-    });
-    document.getElementById('memberModal').addEventListener('click', (e)=>{
-      if(e.target.id==='memberModal'){
-        document.getElementById('memberModal').classList.add('hidden');
-        document.getElementById('memberModal').classList.remove('flex');
       }
     });
 
-    // Init
-    feather.replace();
-    await populateMemberDropdowns();
-    await loadMembers();
-  </script>
-</body>
-</html>
+    document.getElementById("memberModal").classList.remove("hidden");
+    document.getElementById("memberModal").classList.add("flex");
+  }
+  window.viewMember = viewMember;
+
+  document.getElementById("closeModal").addEventListener("click", () => {
+    document.getElementById("memberModal").classList.add("hidden");
+    document.getElementById("memberModal").classList.remove("flex");
+  });
+
+  document.getElementById("memberModal").addEventListener("click", (e) => {
+    if (e.target.id === "memberModal") {
+      document.getElementById("memberModal").classList.add("hidden");
+      document.getElementById("memberModal").classList.remove("flex");
+    }
+  });
+
+  // Init
+  feather.replace();
+  startMembersListener();
+</script>
