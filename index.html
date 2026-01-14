@@ -14,8 +14,8 @@
   <style>
     @import url('https://fonts.googleapis.com/css2?family=MedievalSharp&family=Inter:wght@300;400;500;600;700&display=swap');
     .medieval-font { font-family: 'MedievalSharp', cursive; }
-    .gradient-bg { background: linear-gradient(135deg, #535247 0%, #b9b8b4 100%); }
-    .frosted-glass { backdrop-filter: blur(10px); background: rgba(255,255,255,0.1); }
+    .gradient-bg { background: linear-gradient(135deg, #161133 0%, #29273f 100%); }
+    .frosted-glass { backdrop-filter: blur(10px); background: rgba(75, 59, 163, 0.1); }
     .class-badge { padding: 0.25rem 0.75rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 600; text-transform: uppercase; }
     .cp-progress-bar { transition: width 0.5s ease-in-out; }
     .achievement-badge { animation: pulse 2s infinite; box-shadow: 0 0 15px rgba(255,215,0,0.5); }
@@ -38,7 +38,7 @@
     <div class="hidden md:flex space-x-6">
       <a href="#dashboard" class="hover:text-yellow-400 transition-colors">Dashboard</a>
       <a href="#members" class="hover:text-yellow-400 transition-colors">Members</a>
-      <a href="#submit" class="hover:text-yellow-400 transition-colors">Submit CP</a>
+      <!-- Removed Submit CP link -->
       <a href="#admin" class="hover:text-yellow-400 transition-colors">Register</a>
     </div>
 
@@ -131,31 +131,6 @@
       <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Guild Members</h2>
       <div class="flex flex-wrap gap-2 mb-8 justify-center" id="class-filters"></div>
       <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6" id="members-grid"></div>
-    </div>
-  </section>
-
-  <!-- ✅ Submit CP (no login) -->
-  <section id="submit" class="py-16 bg-gray-900">
-    <div class="container mx-auto px-6 max-w-xl">
-      <h2 class="text-3xl font-bold mb-8 text-center medieval-font">Submit CP Update</h2>
-
-      <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
-        <form id="submit-cp-form" class="space-y-4">
-          <select id="submit-member-select" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
-            <option value="">Select Your Name</option>
-          </select>
-
-          <input type="number" id="submit-cp-value" placeholder="New CP" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
-
-          <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
-            Submit
-          </button>
-        </form>
-
-        <p class="text-sm text-gray-400 mt-3">
-          Your submission will be reviewed by Admin before it updates the leaderboard.
-        </p>
-      </div>
     </div>
   </section>
 
@@ -254,7 +229,6 @@
     const db = getDatabase(app);
 
     const membersRootRef = ref(db, "members");
-    const submissionsRootRef = ref(db, "submissions");
 
     // ✅ Admin Auth
     const auth = getAuth(app);
@@ -335,21 +309,6 @@
       select.innerHTML = '<option value="">Select Member</option>';
 
       const list = await fetchMembers();
-      list.forEach(m=>{
-        const option = document.createElement('option');
-        option.value = m.id;
-        option.textContent = m.name;
-        select.appendChild(option);
-      });
-    }
-
-    async function populateSubmitDropdown() {
-      const select = document.getElementById('submit-member-select');
-      select.innerHTML = '<option value="">Select Your Name</option>';
-
-      const list = await fetchMembers();
-      list.sort((a,b)=> (a.name||"").localeCompare(b.name||""));
-
       list.forEach(m=>{
         const option = document.createElement('option');
         option.value = m.id;
@@ -482,19 +441,6 @@
       feather.replace();
     }
 
-    // ✅ Members submit CP -> /submissions (no login)
-    document.getElementById("submit-cp-form").addEventListener("submit", async (e) => {
-      e.preventDefault();
-      const memberId = document.getElementById("submit-member-select").value;
-      const newCP = parseInt(document.getElementById("submit-cp-value").value, 10);
-      if(!memberId || Number.isNaN(newCP)) return alert("Select your name and enter CP");
-
-      const newRef = push(submissionsRootRef);
-      await set(newRef, { memberId, newCP, createdAt: Date.now(), status: "pending" });
-      document.getElementById("submit-cp-value").value = "";
-      alert("Submitted! Admin will review it.");
-    });
-
     // ✅ Add Member (EVERYONE can create)
     document.getElementById('add-member-form').addEventListener('submit', async e=>{
       e.preventDefault();
@@ -523,7 +469,6 @@
       alert("Member added!");
       e.target.reset();
       await populateMemberDropdowns();
-      await populateSubmitDropdown();
       await loadMembers();
     });
 
@@ -572,7 +517,6 @@
         await remove(ref(db, `members/${id}`));
         alert("Deleted");
         await populateMemberDropdowns();
-        await populateSubmitDropdown();
         await loadMembers();
       } catch(err){
         console.error("DELETE FAILED:", err);
@@ -635,7 +579,6 @@
     // Init
     feather.replace();
     await populateMemberDropdowns();
-    await populateSubmitDropdown();
     await loadMembers();
   </script>
 </body>
