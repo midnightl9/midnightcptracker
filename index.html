@@ -20,6 +20,9 @@
     .cp-progress-bar { transition: width 0.5s ease-in-out; }
     .achievement-badge { animation: pulse 2s infinite; box-shadow: 0 0 15px rgba(255,215,0,0.5); }
     @keyframes pulse { 0% { transform: scale(1); } 50% { transform: scale(1.05); } 100% { transform: scale(1); } }
+
+    /* Admin-only tools hidden by default */
+    #admin-only-tools { display:none; }
   </style>
 </head>
 
@@ -30,14 +33,27 @@
       <i data-feather="shield" class="text-yellow-400"></i>
       <h1 class="text-xl medieval-font">Guild Power</h1>
     </div>
+
     <div class="hidden md:flex space-x-6">
       <a href="#dashboard" class="hover:text-yellow-400 transition-colors">Dashboard</a>
       <a href="#members" class="hover:text-yellow-400 transition-colors">Members</a>
+      <a href="#submit" class="hover:text-yellow-400 transition-colors">Submit CP</a>
       <a href="#admin" class="hover:text-yellow-400 transition-colors">Admin</a>
     </div>
-    <button class="md:hidden">
-      <i data-feather="menu"></i>
-    </button>
+
+    <!-- ✅ Admin Login/Logout -->
+    <div class="flex items-center gap-3">
+      <button id="adminLoginBtn" class="bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold px-4 py-2 rounded-lg">
+        Admin Login
+      </button>
+      <button id="adminLogoutBtn" class="hidden bg-gray-700 hover:bg-gray-600 text-white font-bold px-4 py-2 rounded-lg">
+        Logout
+      </button>
+
+      <button class="md:hidden">
+        <i data-feather="menu"></i>
+      </button>
+    </div>
   </nav>
 
   <!-- Hero Section -->
@@ -116,12 +132,37 @@
     </div>
   </section>
 
+  <!-- ✅ Submit CP (no login) -->
+  <section id="submit" class="py-16 bg-gray-900">
+    <div class="container mx-auto px-6 max-w-xl">
+      <h2 class="text-3xl font-bold mb-8 text-center medieval-font">Submit CP Update</h2>
+
+      <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
+        <form id="submit-cp-form" class="space-y-4">
+          <select id="submit-member-select" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
+            <option value="">Select Your Name</option>
+          </select>
+
+          <input type="number" id="submit-cp-value" placeholder="New CP" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
+
+          <button type="submit" class="w-full bg-green-500 hover:bg-green-600 text-white font-bold py-3 rounded-lg">
+            Submit
+          </button>
+        </form>
+
+        <p class="text-sm text-gray-400 mt-3">
+          Your submission will be reviewed by Admin before it updates the leaderboard.
+        </p>
+      </div>
+    </div>
+  </section>
+
   <!-- Admin Section -->
   <section id="admin" class="py-16 bg-gray-900">
     <div class="container mx-auto px-6">
       <h2 class="text-3xl font-bold mb-12 text-center medieval-font">Admin Dashboard</h2>
       <div class="grid grid-cols-1 lg:grid-cols-2 gap-8">
-        <!-- Add Member Form -->
+        <!-- Add Member Form (Admin creates official members) -->
         <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
           <h3 class="text-xl font-bold mb-6">Add New Member</h3>
           <form id="add-member-form" class="space-y-4">
@@ -140,21 +181,30 @@
             </select>
             <input type="number" id="new-member-cp" placeholder="Initial CP" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3">
             <input type="text" id="new-member-avatar" placeholder="Avatar URL (optional)" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3">
-            <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg">Add Member</button>
+            <button type="submit" class="w-full bg-yellow-500 hover:bg-yellow-600 text-gray-900 font-bold py-3 rounded-lg">
+              Add Member
+            </button>
           </form>
+          <p class="text-sm text-gray-400 mt-3">
+            Only Admin can create official members and approve submissions.
+          </p>
         </div>
 
-        <!-- Update/Delete CP & Member -->
-        <div class="bg-gray-800 rounded-xl p-6 shadow-lg">
+        <!-- ✅ Update/Delete CP & Member (Admin only) -->
+        <div id="admin-only-tools" class="bg-gray-800 rounded-xl p-6 shadow-lg">
           <h3 class="text-xl font-bold mb-4">Update / Delete Member</h3>
           <form id="update-cp-form" class="space-y-4">
             <select id="update-member-select" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
               <option value="">Select Member</option>
             </select>
             <input type="number" id="update-cp-value" placeholder="New CP" class="w-full bg-gray-700 border border-gray-600 rounded-lg px-4 py-3" required>
-            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg">Update CP</button>
+            <button type="submit" class="w-full bg-blue-500 hover:bg-blue-600 text-white font-bold py-3 rounded-lg">
+              Update CP
+            </button>
           </form>
-          <button id="delete-member-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg mt-4">Delete Selected Member</button>
+          <button id="delete-member-btn" class="w-full bg-red-500 hover:bg-red-600 text-white font-bold py-3 rounded-lg mt-4">
+            Delete Selected Member
+          </button>
         </div>
       </div>
     </div>
@@ -176,14 +226,12 @@
     </div>
   </div>
 
-  <!-- ✅ MERGED Firebase v12 (module) + RTDB -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-app.js";
     import { getAnalytics } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-analytics.js";
     import {
       getDatabase,
       ref,
-      child,
       get,
       push,
       set,
@@ -191,7 +239,15 @@
       remove
     } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-database.js";
 
-    // cptracker project + RTDB URL
+    // ✅ Admin auth only
+    import {
+      getAuth,
+      GoogleAuthProvider,
+      signInWithPopup,
+      signOut,
+      onAuthStateChanged
+    } from "https://www.gstatic.com/firebasejs/12.7.0/firebase-auth.js";
+
     const firebaseConfig = {
       apiKey: "AIzaSyA_C0Z-y3CjTFXeWTmvrK7y7cne1jlGbko",
       authDomain: "cptracker-a0f52.firebaseapp.com",
@@ -204,11 +260,47 @@
     };
 
     const app = initializeApp(firebaseConfig);
-    const analytics = getAnalytics(app);
+    getAnalytics(app);
     const db = getDatabase(app);
 
-    // RTDB root: /members
     const membersRootRef = ref(db, "members");
+    const submissionsRootRef = ref(db, "submissions");
+
+    // ✅ Admin Auth
+    const auth = getAuth(app);
+    const provider = new GoogleAuthProvider();
+
+    // 🔒 Replace this with your UID
+    const ADMIN_UID = "PASTE_ADMIN_UID_HERE";
+
+    const adminLoginBtn = document.getElementById("adminLoginBtn");
+    const adminLogoutBtn = document.getElementById("adminLogoutBtn");
+
+    adminLoginBtn.addEventListener("click", async () => {
+      try { await signInWithPopup(auth, provider); }
+      catch (e) { console.error(e); alert("Admin login failed: " + (e?.message || e)); }
+    });
+
+    adminLogoutBtn.addEventListener("click", async () => {
+      try { await signOut(auth); }
+      catch (e) { console.error(e); alert("Logout failed: " + (e?.message || e)); }
+    });
+
+    onAuthStateChanged(auth, (user) => {
+      const isAdmin = !!user && user.uid === ADMIN_UID;
+
+      if (user) {
+        adminLoginBtn.classList.add("hidden");
+        adminLogoutBtn.classList.remove("hidden");
+      } else {
+        adminLoginBtn.classList.remove("hidden");
+        adminLogoutBtn.classList.add("hidden");
+      }
+
+      // show/hide admin-only tools
+      const adminTools = document.getElementById("admin-only-tools");
+      if (adminTools) adminTools.style.display = isAdmin ? "block" : "none";
+    });
 
     const defaultAvatars = {
       'Bow':'https://i.imgur.com/w8VJlOnm.jpg',
@@ -227,7 +319,7 @@
 
     function getWeekLabel(){
       const now = new Date();
-      const day = now.getDay(); // 0=Sun
+      const day = now.getDay();
       const sunday = new Date(now); sunday.setDate(now.getDate()-day);
       const saturday = new Date(sunday); saturday.setDate(sunday.getDate()+6);
       const format = d=>d.toLocaleDateString('en-US',{month:'short', day:'numeric'});
@@ -237,7 +329,6 @@
     async function fetchMembers(){
       const snap = await get(membersRootRef);
       const val = snap.val() || {};
-      // Convert RTDB object into array with id
       return Object.entries(val).map(([id, data]) => ({ id, ...data }));
     }
 
@@ -254,6 +345,21 @@
       });
     }
 
+    async function populateSubmitDropdown() {
+      const select = document.getElementById('submit-member-select');
+      select.innerHTML = '<option value="">Select Your Name</option>';
+
+      const list = await fetchMembers();
+      list.sort((a,b)=> (a.name||"").localeCompare(b.name||""));
+
+      list.forEach(m=>{
+        const option = document.createElement('option');
+        option.value = m.id;
+        option.textContent = m.name;
+        select.appendChild(option);
+      });
+    }
+
     function renderClassFilters(){
       const wrap = document.getElementById("class-filters");
       const classes = ["ALL", ...new Set(membersCache.map(m=>m.class))];
@@ -261,10 +367,8 @@
       wrap.innerHTML = classes.map(cls => {
         const isActive = cls === activeClassFilter;
         return `
-          <button
-            class="px-3 py-1 rounded-full text-sm border ${isActive ? 'bg-yellow-500 text-gray-900 border-yellow-400' : 'bg-gray-800 text-white border-gray-700'}"
-            data-class="${cls}"
-          >${cls}</button>
+          <button class="px-3 py-1 rounded-full text-sm border ${isActive ? 'bg-yellow-500 text-gray-900 border-yellow-400' : 'bg-gray-800 text-white border-gray-700'}"
+            data-class="${cls}">${cls}</button>
         `;
       }).join("");
 
@@ -282,7 +386,7 @@
       if(!canvas) return;
       const ctx = canvas.getContext("2d");
 
-      const weekMap = new Map(); // weekLabel -> totalCP
+      const weekMap = new Map();
       membersCache.forEach(m=>{
         const list = Array.isArray(m.weeklyCP) ? m.weeklyCP : [];
         list.forEach(w=>{
@@ -380,7 +484,28 @@
       feather.replace();
     }
 
-    // Add Member (RTDB)
+    // ✅ Members submit CP -> goes to /submissions (no login)
+    document.getElementById("submit-cp-form").addEventListener("submit", async (e) => {
+      e.preventDefault();
+
+      const memberId = document.getElementById("submit-member-select").value;
+      const newCP = parseInt(document.getElementById("submit-cp-value").value, 10);
+
+      if(!memberId || Number.isNaN(newCP)) return alert("Select your name and enter CP");
+
+      const newRef = push(submissionsRootRef);
+      await set(newRef, {
+        memberId,
+        newCP,
+        createdAt: Date.now(),
+        status: "pending"
+      });
+
+      document.getElementById("submit-cp-value").value = "";
+      alert("Submitted! Admin will review it.");
+    });
+
+    // Add Member (Admin - writes to /members)
     document.getElementById('add-member-form').addEventListener('submit', async e=>{
       e.preventDefault();
 
@@ -393,7 +518,6 @@
       const color = document.querySelector(`#new-member-class option[value="${cls}"]`)?.dataset.color || 'bg-gray-500';
       if(!name || !cls || Number.isNaN(cp)) return alert("Fill all fields");
 
-      // Prevent duplicates (same name + class)
       const existing = await fetchMembers();
       const exists = existing.some(m =>
         (m.name||"").toLowerCase() === name.toLowerCase() && m.class === cls
@@ -415,10 +539,11 @@
       alert("Member added!");
       e.target.reset();
       await populateMemberDropdowns();
+      await populateSubmitDropdown();
       await loadMembers();
     });
 
-    // Update CP (RTDB)
+    // Update CP (Admin)
     document.getElementById('update-cp-form').addEventListener('submit', async e=>{
       e.preventDefault();
 
@@ -452,7 +577,7 @@
       await loadMembers();
     });
 
-    // Delete Member (RTDB)
+    // Delete Member (Admin)
     document.getElementById('delete-member-btn').addEventListener('click', async ()=>{
       const id = document.getElementById('update-member-select').value;
       if(!id) return alert("Select member");
@@ -461,6 +586,7 @@
       await remove(ref(db, `members/${id}`));
       alert("Deleted");
       await populateMemberDropdowns();
+      await populateSubmitDropdown();
       await loadMembers();
     });
 
@@ -519,6 +645,7 @@
     // Init
     feather.replace();
     await populateMemberDropdowns();
+    await populateSubmitDropdown();
     await loadMembers();
   </script>
 </body>
